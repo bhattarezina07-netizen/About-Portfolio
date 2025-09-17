@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Number Guess Game with Chat History</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}
+    body{font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background:linear-gradient(180deg,#061124 0%,#071527 100%);color:#e6eef8}
+    .wrap{max-width:900px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    h1{margin:0;font-size:20px}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 30px rgba(3,7,18,0.6);border:1px solid rgba(255,255,255,0.02)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=number],select,input[type=text]{background:var(--glass);border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:8px;color:inherit;width:100%}
+    button{background:linear-gradient(90deg,var(--accent),#5b21b6);border:none;padding:10px 14px;border-radius:10px;color:white;cursor:pointer;font-weight:600}
+    .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+    .log{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;max-height:220px;overflow:auto;font-size:14px}
+    .big{font-size:28px;font-weight:700}
+    .muted{color:var(--muted)}
+    .flex{display:flex;gap:12px;align-items:center}
+    .pill{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:999px;font-weight:600}
+    footer{margin-top:12px;color:var(--muted);font-size:13px}
+    .chat-history{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;max-height:300px;overflow:auto;margin-top:12px;font-size:14px}
+    @media (max-width:520px){header{flex-direction:column;align-items:flex-start} .controls{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div style="width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#0f1724);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--accent)">AI</div>
+      <div>
+        <h1>AI Number Guess Game</h1>
+        <div class="muted">Two modes: you guess the computer's number — or let the AI guess yours.</div>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="controls">
+        <div>
+          <label>Minimum value</label>
+          <input id="minVal" type="number" value="1">
+        </div>
+        <div>
+          <label>Maximum value</label>
+          <input id="maxVal" type="number" value="100">
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="mode">
+            <option value="you">You guess</option>
+            <option value="ai">AI guesses</option>
+          </select>
+        </div>
+        <div>
+          <label>Difficulty (AI mode)</label>
+          <select id="difficulty">
+            <option value="perfect">Perfect (binary search)</option>
+            <option value="noisy">Noisy (may lie 1-2 times)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:12px">
+        <button id="startBtn">Start Game</button>
+        <button id="resetBtn" style="background:transparent;border:1px solid rgba(255,255,255,0.06);">Reset</button>
+        <div style="flex:1"></div>
+        <div class="pill" id="status">Idle</div>
+      </div>
+
+      <div id="gameArea" style="margin-top:8px;display:grid;grid-template-columns:1fr 320px;gap:12px">
+        <div>
+          <div class="card" style="background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);">
+            <div id="instructions" class="muted">Press <strong>Start Game</strong> to begin. Choose a mode and range first.</div>
+
+            <div id="youGuessArea" style="margin-top:12px;display:none">
+              <label>Your guess</label>
+              <div style="display:flex;gap:8px">
+                <input id="yourGuess" type="number" placeholder="Enter a number">
+                <button id="submitGuess">Guess</button>
+              </div>
+            </div>
+
+            <div id="aiGuessArea" style="margin-top:12px;display:none">
+              <label>Think of a number (don't tell AI). When ready, click 'AI Guess'.
+              </label>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="aiGuessBtn">AI Guess</button>
+                <button id="aiHigher">Higher</button>
+                <button id="aiLower">Lower</button>
+                <button id="aiCorrect">Correct</button>
+              </div>
+            </div>
+
+            <div style="margin-top:12px">
+              <div class="muted">Game Log</div>
+              <div class="log" id="log"></div>
+            </div>
+
+            <div class="chat-history" id="chatHistory">
+              <div class="muted">Chat History (this conversation included)</div>
+              <div id="chatContent"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="muted">Game Stats</div>
+            <div style="margin-top:10px">
+              <div>Tries: <span id="tries" class="big">0</span></div>
+              <div>Last guess: <span id="lastGuess" class="big muted">—</span></div>
+              <div style="margin-top:8px">Range: <span id="range" class="pill muted">—</span></div>
+            </div>
+            <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+            <div class="muted">Tips</div>
+            <ul style="margin:8px 0 0 16px;color:var(--muted)">
+              <li>In AI mode, choose perfect difficulty for fastest result.</li>
+              <li>If you pick noisy, AI may intentionally mis-evaluate up to 2 replies to simulate errors.</li>
+              <li>Range must be valid (min &lt; max).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <footer>Made for fun · Open it in your browser (save as <code>ai-number-guess.html</code>)</footer>
+    </div>
+  </div>
+
+<script>
+  // Game state
+  const el = id=>document.getElementById(id);
+  let state = { min:1, max:100, secret:null, tries:0, mode:'you', aiLow:null, aiHigh:null, aiLast:null, aiLiesLeft:0, running:false };
+
+  function log(msg){ const d=el('log'); d.innerHTML = `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`+d.innerHTML; }
+  function setStatus(s){ el('status').textContent = s; }
+  function updateStats(){ el('tries').textContent = state.tries; el('lastGuess').textContent = state.aiLast ?? '—'; el('range').textContent = `${state.min} → ${state.max}`; }
+
+  function addChatHistory(text){ const chat = el('chatContent'); chat.innerHTML += `<div>${text}</div>`; }
+
+  // Insert this conversation as default chat history
+  const initialChat = `User: create a Ai number guess game
+Assistant: Done — I created a single-file HTML AI Number Guess Game.
+User: include this chat history in the game that is created so it will be visible and we can get direct access to it
+Assistant: Added chat history panel in the game.`;
+  addChatHistory(initialChat);
+
+  document.getElementById('startBtn').onclick = ()=>{
+    const min = parseInt(el('minVal').value)||1;
+    const max = parseInt(el('maxVal').value)||100;
+    if(min>=max){ alert('Min must be less than max'); return; }
+    state.min=min; state.max=max; state.mode=el('mode').value; state.tries=0; state.running=true; state.aiLow=min; state.aiHigh=max; state.aiLast=null; el('log').innerHTML='';
+    if(state.mode==='you'){
+      state.secret = Math.floor(Math.random()*(max-min+1))+min;
+      el('youGuessArea').style.display='block'; el('aiGuessArea').style.display='none'; el('yourGuess').value='';
+      setStatus('You are guessing — Good luck!'); log('Computer selected a secret number.'); addChatHistory('Game started: User guesses the computer number.');
+    } else {
+      state.secret = null; el('youGuessArea').style.display='none'; el('aiGuessArea').style.display='block';
+      const difficulty = el('difficulty').value; state.aiLiesLeft = (difficulty==='noisy')? Math.min(2, Math.floor((max-min)/50)+1) : 0;
+      setStatus('AI will guess — press AI Guess'); log('AI ready — think of a number.'); addChatHistory('Game started: AI guesses the user number.');
+    }
+    updateStats();
+  };
+
+  document.getElementById('resetBtn').onclick = ()=>{
+    state = {min:1,max:100,secret:null,tries:0,mode:'you',aiLow:null,aiHigh:null,aiLast:null,aiLiesLeft:0,running:false};
+    el('youGuessArea').style.display='none'; el('aiGuessArea').style.display='none'; el('log').innerHTML=''; setStatus('Idle'); updateStats();
+    addChatHistory('Game reset.');
+  };
+
+  document.getElementById('submitGuess').onclick = ()=>{
+    if(!state.running || state.mode!=='you') return; const g = parseInt(el('yourGuess').value);
+    if(isNaN(g)){ alert('Enter a number'); return; }
+    state.tries++; updateStats(); log(`You guessed ${g}`); addChatHistory(`User guessed: ${g}`);
+    if(g===state.secret){ setStatus('You win!'); log('Correct — you found the number.'); addChatHistory('Result: User won.'); alert('Correct! You win 🎉'); state.running=false; }
+    else if(g<state.secret){ setStatus('Too low'); log('Answer: Higher'); addChatHistory('Feedback: Higher'); }
+    else { setStatus('Too high'); log('Answer: Lower'); addChatHistory('Feedback: Lower'); }
+  };
+
+  function aiMakeGuess(){ if(!state.running || state.mode!=='ai') return;
+    const mid = Math.floor((state.aiLow + state.aiHigh)/2);
+    state.aiLast = mid; state.tries++; updateStats(); log(`AI guesses ${mid}`); addChatHistory(`AI guessed: ${mid}`);
+    setStatus('AI guessed '+mid);
+  }
+
+  el('aiGuessBtn').onclick = ()=>{ if(!state.running || state.mode!=='ai') return; if(state.aiLow > state.aiHigh){ setStatus('Contradiction detected'); log('Range invalid — maybe inconsistent feedback.'); return; } aiMakeGuess(); };
+  el('aiHigher').onclick = ()=>{ if(!state.running || state.mode!=='ai' || state.aiLast==null) return; const lied = maybeLie(); if(lied){ log('AI received feedback "Higher" but AI treats it as Lower'); setStatus('AI misread'); state.aiHigh = state.aiLast - 1; addChatHistory('User said Higher (simulated lie applied)'); } else { state.aiLow = state.aiLast + 1; log('Feedback: Higher'); setStatus('Noted: higher'); addChatHistory('User said Higher'); } state.aiLast = null; updateStats(); };
+  el('aiLower').onclick = ()=>{ if(!state.running || state.mode!=='ai' || state.aiLast==null) return; const lied = maybeLie(); if(lied){ log('AI received feedback "Lower" but AI treats it as Higher'); setStatus('AI misread'); state.aiLow = state.aiLast + 1; addChatHistory('User said Lower (simulated lie applied)'); } else { state.aiHigh = state.aiLast -1; log('Feedback: Lower'); setStatus('Noted: lower'); addChatHistory('User said Lower'); } state.aiLast=null; updateStats(); };
+  el('aiCorrect').onclick = ()=>{ if(!state.running || state.mode!=='ai' || state.aiLast==null) return; state.tries++; updateStats(); log('AI was correct!'); setStatus('AI wins 🎉'); addChatHistory('AI guessed correctly.'); alert('AI guessed your number — nice!'); state.running=false; };
+  function maybeLie(){ if(state.aiLiesLeft>0 && Math.random()<0.2){ state.aiLiesLeft--; return true } return false }
+
+  updateStats();
+  el('yourGuess').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('submitGuess').click(); });
+</script>
+</body>
+</html>
